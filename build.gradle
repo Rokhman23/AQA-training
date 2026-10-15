@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+    outputs.upToDateWhen { false }
+    jvmArgs '-Dfile.encoding=UTF-8'
+    onOutput { descriptor, event ->
+        if (event.destination == org.gradle.api.tasks.testing.TestOutputEvent.Destination.StdOut) {
+            logger.quiet(event.message.trim())
+        }
+    }
+}
+
+tasks.register('runAllTests') {
+    group = 'verification'
+    description = 'Runs all project tests.'
+    dependsOn tasks.named('test')
+}
+
+tasks.register('afterTests') {
+    group = 'verification'
+    description = 'Prints a message after all tests have run.'
+    dependsOn tasks.named('runAllTests')
+    doLast {
+        println 'Test run is over'
+    }
+}
+
+tasks.named('wrapper') {
+    gradleVersion = '9.6.1'
+    distributionType = Wrapper.DistributionType.BIN
+}
