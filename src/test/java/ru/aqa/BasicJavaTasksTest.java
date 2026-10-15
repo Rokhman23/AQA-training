@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Arrays;
@@ -91,28 +90,13 @@ class BasicJavaTasksTest {
         String expected = score <= 20 ? "E" : score <= 40 ? "D" : score <= 60 ? "C" : score <= 80 ? "B" : "A";
         String actual = BasicJavaTasks.getGrade(score);
         report(4, score, actual, expected);
-    }
-
-    // Задача 4
-    @Order(5)
-    @ParameterizedTest
-    @CsvSource({
-            "-5, Error",
-            "0, E",
-            "20, E",
-            "21, D",
-            "40, D",
-            "41, C",
-            "60, C",
-            "61, B",
-            "80, B",
-            "81, A",
-            "100, A",
-            "101, Error"
-    })
-    void getGradeHandlesBoundaries(int score, String expected) {
-        String actual = BasicJavaTasks.getGrade(score);
-        report(4, score, actual, expected);
+        int[] boundaryScores = {-1, 0, 20, 21, 40, 41, 60, 61, 80, 81, 100, 101};
+        String[] boundaryGrades = {"Error", "E", "E", "D", "D", "C", "C", "B", "B", "A", "A", "Error"};
+        boolean boundariesPassed = true;
+        for (int i = 0; i < boundaryScores.length; i++) {
+            boundariesPassed &= boundaryGrades[i].equals(BasicJavaTasks.getGrade(boundaryScores[i]));
+        }
+        reportStructure(4, "Проверка границ диапазонов", boundariesPassed);
     }
 
     static IntStream randomScores() {
@@ -120,7 +104,7 @@ class BasicJavaTasksTest {
     }
 
     // Задача 5
-    @Order(6)
+    @Order(5)
     @RepeatedTest(4)
     void blastOffWorksForRandomStart() {
         int start = RANDOM.nextInt(1, 11);
@@ -131,7 +115,7 @@ class BasicJavaTasksTest {
     }
 
     // Задача 6
-    @Order(7)
+    @Order(6)
     @ParameterizedTest
     @MethodSource("randomPositiveNumbers")
     void sumToNWorksForRandomNumber(int n) {
@@ -145,7 +129,7 @@ class BasicJavaTasksTest {
     }
 
     // Задача 7
-    @Order(8)
+    @Order(7)
     @Test
     void hasBugWorksForRandomMessages() {
         String[] values = {"Ready", "OK", RANDOM.nextBoolean() ? "Bug" : "Clean"};
@@ -155,27 +139,20 @@ class BasicJavaTasksTest {
     }
 
     // Задача 8
-    @Order(9)
+    @Order(8)
     @RepeatedTest(4)
     void getEvenInRangeWorksForRandomRange() {
         int start = RANDOM.nextInt(0, 50);
-        int end = start + RANDOM.nextInt(0, 20);
-        String expected = IntStream.rangeClosed(start, end).filter(n -> n % 2 == 0)
+        int end = RANDOM.nextInt(0, 50);
+        String expected = IntStream.rangeClosed(Math.min(start, end), Math.max(start, end)).filter(n -> n % 2 == 0)
                 .mapToObj(Integer::toString).reduce((a, b) -> a + " " + b).orElse("");
         String actual = BasicJavaTasks.getEvenInRange(start, end);
         report(8, start + ".." + end, actual, expected);
-    }
-
-    // Задача 8
-    @Order(10)
-    @Test
-    void getEvenInRangeHandlesReversedBounds() {
-        String actual = BasicJavaTasks.getEvenInRange(5, 2);
-        report(8, "5..2 (reversed bounds)", actual, "2 4");
+        reportStructure(8, "Перевёрнутые границы 5..2", "2 4".equals(BasicJavaTasks.getEvenInRange(5, 2)));
     }
 
     // Задача 9
-    @Order(11)
+    @Order(9)
     @ParameterizedTest
     @MethodSource("randomArrays")
     void findMaxWorksForRandomArray(int[] values) {
@@ -189,7 +166,7 @@ class BasicJavaTasksTest {
     }
 
     // Задача 10
-    @Order(12)
+    @Order(10)
     @Test
     void reverseWorksForRandomArray() {
         String[] values = {"One", "Two", "Zero", Integer.toString(RANDOM.nextInt(100))};
@@ -200,7 +177,7 @@ class BasicJavaTasksTest {
     }
 
     // Задача 11
-    @Order(13)
+    @Order(11)
     @RepeatedTest(4)
     void calcAverageWorksForRandomNumbers() {
         List<Integer> values = RANDOM.ints(5, 0, 101).boxed().toList();
@@ -210,7 +187,7 @@ class BasicJavaTasksTest {
     }
 
     // Задача 12
-    @Order(14)
+    @Order(12)
     @ParameterizedTest
     @MethodSource("randomNameLists")
     void removeSpecificNameWorksForRandomList(List<String> names) {
