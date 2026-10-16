@@ -16,7 +16,12 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        def selectedTag = providers.gradleProperty('testTag')
+        if (selectedTag.isPresent()) {
+            includeTags(selectedTag.get())
+        }
+    }
     outputs.upToDateWhen { false }
     jvmArgs '-Dfile.encoding=UTF-8'
     onOutput { descriptor, event ->
