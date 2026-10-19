@@ -8,6 +8,8 @@ repositories {
 
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testImplementation 'io.rest-assured:rest-assured:5.5.0'
+    testImplementation 'org.assertj:assertj-core:3.27.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
 }
 
@@ -44,6 +46,19 @@ tasks.register('afterTests') {
     doLast {
         println 'Test run is over'
     }
+}
+
+tasks.register('apiTest', Test) {
+    group = 'verification'
+    description = 'Runs only REST Assured API tests tagged api.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags('api')
+    }
+    outputs.upToDateWhen { false }
+    jvmArgs '-Dfile.encoding=UTF-8'
 }
 
 tasks.named('wrapper') {
