@@ -10,6 +10,8 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
     testImplementation 'io.rest-assured:rest-assured:5.5.0'
     testImplementation 'org.assertj:assertj-core:3.27.3'
+    testImplementation 'org.seleniumhq.selenium:selenium-java:4.51.0'
+    testImplementation 'com.codeborne:selenide:7.19.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
 }
 
@@ -56,6 +58,19 @@ tasks.register('apiTest', Test) {
     classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform {
         includeTags('api')
+    }
+    outputs.upToDateWhen { false }
+    jvmArgs '-Dfile.encoding=UTF-8'
+}
+
+tasks.register('uiTest', Test) {
+    group = 'verification'
+    description = 'Runs Selenium and Selenide UI tests (requires the training API at localhost:8080).'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags('selenium', 'selenide', 'webinar')
     }
     outputs.upToDateWhen { false }
     jvmArgs '-Dfile.encoding=UTF-8'
