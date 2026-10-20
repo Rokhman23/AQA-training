@@ -84,9 +84,12 @@ class GoodsWebinarSelenideTests {
     }
 
     private long createProduct(String name, double price) {
+        String requestBody = """
+                {"name":"%s","price":%s}
+                """.formatted(name, price);
         Response response = given().auth().preemptive().basic(USER, PASSWORD)
                 .contentType("application/json")
-                .body("{\"name\":\"" + name + "\",\"price\":" + price + "}")
+                .body(requestBody)
                 .post(BASE_URL + "/goods/add");
         response.then().statusCode(200);
         Map<String, Object> data = response.jsonPath().getMap("data");
@@ -117,6 +120,7 @@ class GoodsWebinarSelenideTests {
         return "HW6-" + suffix + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 }
+
 
 
 
