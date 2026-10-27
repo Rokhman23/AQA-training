@@ -14,15 +14,18 @@ import static com.codeborne.selenide.Selenide.*;
 
 @Tag("selenide")
 class GoodsSelenideTests {
-    static final String BASE_URL = "http://localhost:8080";
-    static final String USER = "admin";
-    static final String PASSWORD = "secret123";
+    static final String BASE_URL = TestConfig.uiUrl();
+    static final String USER = TestConfig.adminUsername();
+    static final String PASSWORD = TestConfig.adminPassword();
+    static final String STARTER_PRODUCT_NAME = TestConfig.starterProductName();
+    static final int STARTER_PRODUCT_PRICE = TestConfig.starterProductPrice();
     private String name;
 
     @BeforeEach
     void configureBrowser() {
         Configuration.browser = "chrome";
-        Configuration.timeout = 7000;
+        Configuration.timeout = TestConfig.elementsTimeoutMs();
+        TestConfig.printSafeSettings();
         name = "Selenide " + UUID.randomUUID().toString().substring(0, 8);
     }
 
@@ -43,10 +46,11 @@ class GoodsSelenideTests {
     @Test
     void addProductToCartAndSeeItThere() {
         open(BASE_URL + "/");
-        $$(".product-card").findBy(text("Учебный товар 25"))
+        $$(".product-card").findBy(text(STARTER_PRODUCT_NAME))
                 .$("[data-action='add-to-cart']").click();
         $("#open-cart-btn").click();
-        $("#cart-items .cart-item").shouldHave(text("Учебный товар 25"));
+        $("#cart-items .cart-item").shouldHave(text(STARTER_PRODUCT_NAME));
+        $("#total-price").shouldHave(text(String.valueOf(STARTER_PRODUCT_PRICE)));
     }
 
     @Test
@@ -62,17 +66,17 @@ class GoodsSelenideTests {
     @Test
     void cartRemainsAfterPageRefresh() {
         open(BASE_URL + "/");
-        $$(".product-card").findBy(text("Учебный товар 25"))
+        $$(".product-card").findBy(text(STARTER_PRODUCT_NAME))
                 .$("[data-action='add-to-cart']").click();
         refresh();
         $("#open-cart-btn").click();
-        $("#cart-items").shouldHave(text("Учебный товар 25"));
+        $("#cart-items").shouldHave(text(STARTER_PRODUCT_NAME));
     }
 
     @Test
     void overThreeHundredShowsJavaScriptAlert() {
         open(BASE_URL + "/");
-        $$(".product-card").findBy(text("Учебный товар 25"))
+        $$(".product-card").findBy(text(STARTER_PRODUCT_NAME))
                 .$("[data-action='add-to-cart']").click();
         // Increase the quantity of the 50-ruble product to make the cart exceed 300.
         $$(".product-card").findBy(text("Стакан")).$("input").setValue("6");
@@ -80,7 +84,7 @@ class GoodsSelenideTests {
                 .$("[data-action='add-to-cart']").click();
         $("#open-cart-btn").click();
         $("#makeOrder").click();
-        confirm("[SmartShop]: Денег не хватает! Сумма 325 ₽ превышает лимит 300 ₽.");
+        confirm("[SmartShop]: Денег не хватает! Сумма " + (300 + STARTER_PRODUCT_PRICE) + " ₽ превышает лимит 300 ₽.");
     }
 
     private void openAdmin() {

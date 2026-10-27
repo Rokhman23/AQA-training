@@ -1,6 +1,8 @@
 package ru.aqa;
 
 import io.restassured.response.Response;
+import com.codeborne.selenide.Configuration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -17,15 +19,22 @@ import static io.restassured.RestAssured.given;
 @Tag("webinar")
 class GoodsWebinarSelenideTests {
     private static final String BASE_URL = GoodsSelenideTests.BASE_URL;
+    private static final String API_URL = TestConfig.apiUrl();
     private static final String USER = GoodsSelenideTests.USER;
     private static final String PASSWORD = GoodsSelenideTests.PASSWORD;
     private final List<Long> createdIds = new ArrayList<>();
+
+    @BeforeEach
+    void configureBrowser() {
+        Configuration.timeout = TestConfig.elementsTimeoutMs();
+        TestConfig.printSafeSettings();
+    }
 
     @AfterEach
     void removeApiGeneratedProducts() {
         for (Long id : createdIds) {
             given().auth().preemptive().basic(USER, PASSWORD)
-                    .delete(BASE_URL + "/goods/{id}", id);
+                    .delete(API_URL + "/goods/{id}", id);
         }
         createdIds.clear();
         closeWebDriver();
@@ -34,11 +43,11 @@ class GoodsWebinarSelenideTests {
     @Test
     void orderThreeUnitsAndSeeProcessingNotification() {
         open(BASE_URL + "/");
-        var product = $$(".product-card").findBy(text("Учебный товар 25"));
+        var product = $$(".product-card").findBy(text(TestConfig.starterProductName()));
         product.$("input").setValue("3");
         product.$("[data-action='add-to-cart']").click();
         $("#open-cart-btn").click();
-        $("#total-price").shouldHave(text("75"));
+        $("#total-price").shouldHave(text(String.valueOf(3 * TestConfig.starterProductPrice())));
         $("#makeOrder").click();
         $("#toast-container").shouldHave(text("Заказ принят в обработку"));
     }
@@ -90,7 +99,7 @@ class GoodsWebinarSelenideTests {
         Response response = given().auth().preemptive().basic(USER, PASSWORD)
                 .contentType("application/json")
                 .body(requestBody)
-                .post(BASE_URL + "/goods/add");
+                .post(API_URL + "/goods/add");
         response.then().statusCode(200);
         Map<String, Object> data = response.jsonPath().getMap("data");
         Object rawId = data.values().iterator().next();
@@ -101,7 +110,7 @@ class GoodsWebinarSelenideTests {
 
     private void trackIdByName(String name) {
         List<Map<String, Object>> goods = given().auth().preemptive().basic(USER, PASSWORD)
-                .get(BASE_URL + "/goods/list").then().statusCode(200)
+                .get(API_URL + "/goods/list").then().statusCode(200)
                 .extract().jsonPath().getList("goods");
         goods.stream().filter(item -> name.equals(item.get("name")))
                 .map(item -> Long.parseLong(String.valueOf(item.get("id"))))

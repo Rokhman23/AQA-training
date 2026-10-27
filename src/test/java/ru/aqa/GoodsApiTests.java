@@ -26,9 +26,9 @@ import static org.hamcrest.Matchers.is;
 @Tag("api")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class GoodsApiTests {
-    private static final String BASE_URI = "http://localhost:8080";
-    private static final String USERNAME = "admin";
-    private static final String PASSWORD = "secret123";
+    private static final String BASE_URI = TestConfig.apiUrl();
+    private static final String USERNAME = TestConfig.adminUsername();
+    private static final String PASSWORD = TestConfig.adminPassword();
     private static final long MISSING_ID = Long.MAX_VALUE;
 
     private final List<Long> createdIds = new ArrayList<>();
@@ -42,6 +42,7 @@ class GoodsApiTests {
     @BeforeEach
     void resetCreatedProducts() {
         createdIds.clear();
+        TestConfig.printSafeSettings();
     }
 
     @AfterEach

@@ -14,13 +14,14 @@ import static com.codeborne.selenide.Selenide.*;
 
 @Tag("selenide")
 class GoodsDragAndDropTests {
-    private static final String BASE_URL = "http://localhost:8080";
-    private static final String PRODUCT_NAME = "Учебный товар 25";
+    private static final String BASE_URL = TestConfig.uiUrl();
+    private static final String PRODUCT_NAME = TestConfig.starterProductName();
 
     @BeforeEach
     void configureBrowser() {
         Configuration.browser = "chrome";
-        Configuration.timeout = 7000;
+        Configuration.timeout = TestConfig.elementsTimeoutMs();
+        TestConfig.printSafeSettings();
     }
 
     @AfterEach
