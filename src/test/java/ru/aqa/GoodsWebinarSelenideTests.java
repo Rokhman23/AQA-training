@@ -2,8 +2,9 @@ package ru.aqa;
 
 import io.restassured.response.Response;
 import com.codeborne.selenide.Configuration;
-import org.junit.jupiter.api.BeforeEach;
+import com.codeborne.selenide.Selenide;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -12,68 +13,71 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.codeborne.selenide.Condition.text;
-import static com.codeborne.selenide.Selenide.*;
 import static io.restassured.RestAssured.given;
 
 @Tag("webinar")
 class GoodsWebinarSelenideTests {
-    private static final String BASE_URL = GoodsSelenideTests.BASE_URL;
     private static final String API_URL = TestConfig.apiUrl();
-    private static final String USER = GoodsSelenideTests.USER;
-    private static final String PASSWORD = GoodsSelenideTests.PASSWORD;
     private final List<Long> createdIds = new ArrayList<>();
 
     @BeforeEach
     void configureBrowser() {
+        Configuration.browser = "chrome";
         Configuration.timeout = TestConfig.elementsTimeoutMs();
         TestConfig.printSafeSettings();
     }
 
     @AfterEach
-    void removeApiGeneratedProducts() {
+    void removeCreatedProductsAndCloseBrowser() {
         for (Long id : createdIds) {
-            given().auth().preemptive().basic(USER, PASSWORD)
+            given().auth().preemptive()
+                    .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
                     .delete(API_URL + "/goods/{id}", id);
         }
         createdIds.clear();
-        closeWebDriver();
+        Selenide.closeWebDriver();
     }
 
     @Test
     void orderThreeUnitsAndSeeProcessingNotification() {
-        open(BASE_URL + "/");
-        var product = $$(".product-card").findBy(text(TestConfig.starterProductName()));
-        product.$("input").setValue("3");
-        product.$("[data-action='add-to-cart']").click();
-        $("#open-cart-btn").click();
-        $("#total-price").shouldHave(text(String.valueOf(3 * TestConfig.starterProductPrice())));
-        $("#makeOrder").click();
-        $("#toast-container").shouldHave(text("Заказ принят в обработку"));
+        String productName = TestConfig.starterProductName();
+        MainPage mainPage = new MainPage().open();
+        mainPage.check().productIsVisible(productName);
+        mainPage.setProductQuantity(productName, 3).addProductToCart(productName);
+
+        CartPage cartPage = mainPage.openCart();
+        cartPage.check()
+                .containsProduct(productName)
+                .totalEquals(3 * TestConfig.starterProductPrice())
+                .totalIsAtMost(300);
+        cartPage.placeOrder();
+
+        mainPage.check().notificationContains("Заказ принят в обработку");
     }
 
     @Test
     void cartTotalIsCorrectForSeveralDifferentProducts() {
-        String firstName = uniqueName("api-first");
-        String secondName = uniqueName("api-second");
+        String firstName = uniqueName("first");
+        String secondName = uniqueName("second");
         createProduct(firstName, 45);
         createProduct(secondName, 80);
-        open(BASE_URL + "/");
-        $$(".product-card").findBy(text(firstName)).$("[data-action='add-to-cart']").click();
-        $$(".product-card").findBy(text(secondName)).$("[data-action='add-to-cart']").click();
-        $("#open-cart-btn").click();
-        $("#cart-items").shouldHave(text(firstName)).shouldHave(text(secondName));
-        $("#total-price").shouldHave(text("125"));
+
+        MainPage mainPage = new MainPage().open();
+        mainPage.addProductToCart(firstName).addProductToCart(secondName);
+        CartPage cartPage = mainPage.openCart();
+        cartPage.check()
+                .containsProduct(firstName)
+                .containsProduct(secondName)
+                .totalEquals(125);
     }
 
     @Test
     void addProductInAdminAndSeeSuccessNotification() {
-        String name = uniqueName("ui-added");
-        openAdmin();
-        $("#n-name").setValue(name);
-        $("#n-price").setValue("62");
-        $("#add-btn").click();
-        $("#toast-container").shouldHave(text("Товар успешно добавлен"));
+        String name = uniqueName("added");
+        AdminProductsPage adminPage = new AdminLoginPage().open().loginAsConfiguredAdmin();
+        adminPage.check().productFormIsVisible();
+        adminPage.addProduct(name, 62);
+        adminPage.check().notificationContains("Товар успешно добавлен");
         trackIdByName(name);
     }
 
@@ -82,25 +86,27 @@ class GoodsWebinarSelenideTests {
         String oldName = uniqueName("before-edit");
         String newName = uniqueName("after-edit");
         long id = createProduct(oldName, 40);
-        openAdmin();
-        $("#nm-" + id).setValue(newName);
-        $("#pr-" + id).setValue("55");
-        $("#tbody [data-action='update'][data-id='" + id + "']").click();
-        $("#toast-container").shouldHave(text("обновлен"));
-        open(BASE_URL + "/");
-        $("#products-list").shouldHave(text(newName));
-        $$(".product-card").findBy(text(newName)).shouldHave(text("55"));
+
+        AdminProductsPage adminPage = new AdminLoginPage().open().loginAsConfiguredAdmin();
+        adminPage.check().productFormIsVisible();
+        adminPage.editProduct(id, newName, 55);
+        adminPage.check().notificationContains("обновлен");
+
+        MainPage mainPage = adminPage.openStorefront();
+        mainPage.check().productContainsText(newName, "55");
     }
 
-    private long createProduct(String name, double price) {
-        String requestBody = """
-                {"name":"%s","price":%s}
+    private long createProduct(String name, int price) {
+        String body = """
+                {"name":"%s","price":%d}
                 """.formatted(name, price);
-        Response response = given().auth().preemptive().basic(USER, PASSWORD)
+        Response response = given().auth().preemptive()
+                .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
                 .contentType("application/json")
-                .body(requestBody)
+                .body(body)
                 .post(API_URL + "/goods/add");
         response.then().statusCode(200);
+
         Map<String, Object> data = response.jsonPath().getMap("data");
         Object rawId = data.values().iterator().next();
         long id = Long.parseLong(String.valueOf(rawId));
@@ -109,28 +115,18 @@ class GoodsWebinarSelenideTests {
     }
 
     private void trackIdByName(String name) {
-        List<Map<String, Object>> goods = given().auth().preemptive().basic(USER, PASSWORD)
+        List<Map<String, Object>> goods = given().auth().preemptive()
+                .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
                 .get(API_URL + "/goods/list").then().statusCode(200)
                 .extract().jsonPath().getList("goods");
-        goods.stream().filter(item -> name.equals(item.get("name")))
+        goods.stream()
+                .filter(item -> name.equals(item.get("name")))
                 .map(item -> Long.parseLong(String.valueOf(item.get("id"))))
-                .findFirst().ifPresent(createdIds::add);
-    }
-
-    private void openAdmin() {
-        open(BASE_URL + "/admin");
-        $("#username").setValue(USER);
-        $("#password").setValue(PASSWORD);
-        $("button[type='submit']").click();
-        $("#n-name").shouldBe(com.codeborne.selenide.Condition.visible);
+                .findFirst()
+                .ifPresent(createdIds::add);
     }
 
     private String uniqueName(String suffix) {
-        return "HW6-" + suffix + "-" + UUID.randomUUID().toString().substring(0, 8);
+        return "HW9-" + suffix + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 }
-
-
-
-
-

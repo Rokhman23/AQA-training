@@ -7,98 +7,112 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
-import static com.codeborne.selenide.Condition.*;
-import static com.codeborne.selenide.Selenide.*;
+import static io.restassured.RestAssured.given;
 
 @Tag("selenide")
 class GoodsSelenideTests {
-    static final String BASE_URL = TestConfig.uiUrl();
-    static final String USER = TestConfig.adminUsername();
-    static final String PASSWORD = TestConfig.adminPassword();
-    static final String STARTER_PRODUCT_NAME = TestConfig.starterProductName();
-    static final int STARTER_PRODUCT_PRICE = TestConfig.starterProductPrice();
-    private String name;
+    private static final String API_URL = TestConfig.apiUrl();
+    private final List<Long> createdProductIds = new ArrayList<>();
+    private String productName;
 
     @BeforeEach
     void configureBrowser() {
         Configuration.browser = "chrome";
         Configuration.timeout = TestConfig.elementsTimeoutMs();
         TestConfig.printSafeSettings();
-        name = "Selenide " + UUID.randomUUID().toString().substring(0, 8);
+        productName = "Selenide-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     @AfterEach
-    void closeBrowser() { Selenide.closeWebDriver(); }
+    void cleanUp() {
+        for (Long id : createdProductIds) {
+            given().auth().preemptive()
+                    .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
+                    .delete(API_URL + "/goods/{id}", id);
+        }
+        createdProductIds.clear();
+        Selenide.closeWebDriver();
+    }
 
     @Test
     void addProductThroughAdminAndSeeItOnStorefront() {
-        openAdmin();
-        $("#n-name").setValue(name);
-        $("#n-price").setValue("80");
-        $("#add-btn").click();
-        $("#toast-container").shouldHave(text("успешно добавлен"));
-        open(BASE_URL + "/");
-        $("#products-list").shouldHave(text(name));
+        AdminProductsPage adminPage = new AdminLoginPage().open().loginAsConfiguredAdmin();
+        adminPage.check().productFormIsVisible();
+        adminPage.addProduct(productName, 80);
+        adminPage.check().notificationContains("успешно добавлен");
+        trackProductIdByName(productName);
+
+        MainPage mainPage = adminPage.openStorefront();
+        mainPage.check().productIsVisible(productName);
     }
 
     @Test
     void addProductToCartAndSeeItThere() {
-        open(BASE_URL + "/");
-        $$(".product-card").findBy(text(STARTER_PRODUCT_NAME))
-                .$("[data-action='add-to-cart']").click();
-        $("#open-cart-btn").click();
-        $("#cart-items .cart-item").shouldHave(text(STARTER_PRODUCT_NAME));
-        $("#total-price").shouldHave(text(String.valueOf(STARTER_PRODUCT_PRICE)));
+        String name = TestConfig.starterProductName();
+        MainPage mainPage = new MainPage().open();
+        mainPage.check().productIsVisible(name);
+        mainPage.addProductToCart(name);
+
+        mainPage.openCart().check()
+                .containsProduct(name)
+                .totalEquals(TestConfig.starterProductPrice());
     }
 
     @Test
     void wrongCredentialsAreRejectedByAdmin() {
-        open(BASE_URL + "/admin");
-        $("#username").setValue("wrong-user");
-        $("#password").setValue("wrong-password");
-        $("button[type='submit']").click();
-        $("#username").shouldBe(visible);
-        $("body").shouldHave(text("Please sign in"));
+        AdminLoginPage loginPage = new AdminLoginPage().open();
+        loginPage.check().usernameFieldIsVisible()
+                .passwordFieldIsVisible()
+                .loginButtonIsVisible();
+        loginPage.enterCredentials("wrong-user", "wrong-password");
+        loginPage.check().usernameFieldContains("wrong-user")
+                .passwordFieldContains("wrong-password");
+        loginPage.login();
+
+        loginPage.check().usernameFieldIsVisible()
+                .pageBodyContains("Please sign in");
     }
 
     @Test
     void cartRemainsAfterPageRefresh() {
-        open(BASE_URL + "/");
-        $$(".product-card").findBy(text(STARTER_PRODUCT_NAME))
-                .$("[data-action='add-to-cart']").click();
-        refresh();
-        $("#open-cart-btn").click();
-        $("#cart-items").shouldHave(text(STARTER_PRODUCT_NAME));
+        String name = TestConfig.starterProductName();
+        MainPage mainPage = new MainPage().open();
+        mainPage.addProductToCart(name).refresh();
+
+        mainPage.openCart().check()
+                .containsProduct(name)
+                .totalEquals(TestConfig.starterProductPrice());
     }
 
     @Test
     void overThreeHundredShowsJavaScriptAlert() {
-        open(BASE_URL + "/");
-        $$(".product-card").findBy(text(STARTER_PRODUCT_NAME))
-                .$("[data-action='add-to-cart']").click();
-        // Increase the quantity of the 50-ruble product to make the cart exceed 300.
-        $$(".product-card").findBy(text("Стакан")).$("input").setValue("6");
-        $$(".product-card").findBy(text("Стакан"))
-                .$("[data-action='add-to-cart']").click();
-        $("#open-cart-btn").click();
-        $("#makeOrder").click();
-        confirm("[SmartShop]: Денег не хватает! Сумма " + (300 + STARTER_PRODUCT_PRICE) + " ₽ превышает лимит 300 ₽.");
+        String starterName = TestConfig.starterProductName();
+        MainPage mainPage = new MainPage().open();
+        mainPage.addProductToCart(starterName)
+                .setProductQuantity("Стакан", 6)
+                .addProductToCart("Стакан");
+        CartPage cartPage = mainPage.openCart();
+        int total = TestConfig.starterProductPrice() + 6 * 50;
+        cartPage.check().totalEquals(total);
+        cartPage.placeOrder();
+        cartPage.check().orderAlertContains("превышает лимит 300 ₽");
+        cartPage.acceptOrderAlert();
     }
 
-    private void openAdmin() {
-        open(BASE_URL + "/admin");
-        $("#username").setValue(USER);
-        $("#password").setValue(PASSWORD);
-        $("button[type='submit']").click();
-        $("#n-name").shouldBe(visible);
+    private void trackProductIdByName(String name) {
+        List<Map<String, Object>> goods = given().auth().preemptive()
+                .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
+                .get(API_URL + "/goods/list").then().statusCode(200)
+                .extract().jsonPath().getList("goods");
+        goods.stream()
+                .filter(item -> name.equals(item.get("name")))
+                .map(item -> Long.parseLong(String.valueOf(item.get("id"))))
+                .findFirst()
+                .ifPresent(createdProductIds::add);
     }
 }
-
-
-
-
-
-
-
