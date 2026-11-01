@@ -1,107 +1,75 @@
 plugins {
-    id 'java'
+    id 'base'
     id 'io.qameta.allure-report' version '4.3.0'
 }
 
-repositories {
-    mavenCentral()
+allprojects {
+    repositories {
+        mavenCentral()
+    }
 }
 
-configurations {
-    aspectjAgent
-}
+subprojects {
+    configurations {
+        aspectjAgent
+    }
 
-dependencies {
-    testImplementation platform('io.qameta.allure:allure-bom:2.33.0')
-    testImplementation 'io.qameta.allure:allure-junit5'
-    testImplementation 'io.qameta.allure:allure-selenide'
-    testImplementation 'io.qameta.allure:allure-rest-assured'
-    aspectjAgent 'org.aspectj:aspectjweaver:1.9.25.1'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
-    testImplementation 'io.rest-assured:rest-assured:5.5.0'
-    testImplementation 'org.assertj:assertj-core:3.27.3'
-    testImplementation 'org.seleniumhq.selenium:selenium-java:4.51.0'
-    testImplementation 'com.codeborne:selenide:7.19.0'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
-    allureReport(files(layout.buildDirectory.dir('allure-results')))
+    dependencies {
+        aspectjAgent 'org.aspectj:aspectjweaver:1.9.25.1'
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+        outputs.upToDateWhen { false }
+        jvmArgs "-javaagent:${configurations.aspectjAgent.singleFile}"
+        jvmArgs '-Dfile.encoding=UTF-8'
+    }
 }
 
 allure {
     version = '2.42.1'
 }
 
-tasks.withType(Test).configureEach {
-    jvmArgs "-javaagent:${configurations.aspectjAgent.singleFile}"
+dependencies {
+    allureReport(files(rootProject.project(':api-tests').layout.buildDirectory.dir('allure-results')))
+    allureReport(files(rootProject.project(':ui-tests').layout.buildDirectory.dir('allure-results')))
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
+tasks.register('smokeApi') {
+    group = 'verification'
+    description = 'Runs API smoke tests.'
+    dependsOn ':api-tests:smokeTest'
 }
 
-test {
-    useJUnitPlatform {
-        def selectedTag = providers.gradleProperty('testTag')
-        if (selectedTag.isPresent()) {
-            includeTags(selectedTag.get())
-        }
-    }
-    outputs.upToDateWhen { false }
-    jvmArgs '-Dfile.encoding=UTF-8'
-    onOutput { descriptor, event ->
-        if (event.destination == org.gradle.api.tasks.testing.TestOutputEvent.Destination.StdOut) {
-            logger.quiet(event.message.trim())
-        }
-    }
+tasks.register('smokeUi') {
+    group = 'verification'
+    description = 'Runs UI smoke tests.'
+    dependsOn ':ui-tests:smokeTest'
+}
+
+tasks.register('smoke') {
+    group = 'verification'
+    description = 'Runs API and UI smoke tests.'
+    dependsOn tasks.named('smokeApi'), tasks.named('smokeUi')
 }
 
 tasks.register('runAllTests') {
     group = 'verification'
-    description = 'Runs all project tests.'
-    dependsOn tasks.named('test')
+    description = 'Runs tests in all project modules.'
+    dependsOn subprojects.collect { it.tasks.named('test') }
 }
 
 tasks.register('afterTests') {
     group = 'verification'
-    description = 'Prints a message after all tests have run.'
+    description = 'Runs all tests and prints a completion message.'
     dependsOn tasks.named('runAllTests')
     doLast {
         println 'Test run is over'
     }
-}
-
-tasks.register('apiTest', Test) {
-    group = 'verification'
-    description = 'Runs only REST Assured API tests tagged api.'
-    dependsOn tasks.named('testClasses')
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-    useJUnitPlatform {
-        includeTags('api')
-    }
-    outputs.upToDateWhen { false }
-    jvmArgs '-Dfile.encoding=UTF-8'
-}
-
-tasks.register('uiTest', Test) {
-    group = 'verification'
-    description = 'Runs Selenium and Selenide UI tests (requires the training API at localhost:8080).'
-    dependsOn tasks.named('testClasses')
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-    useJUnitPlatform {
-        includeTags('selenium', 'selenide', 'webinar')
-    }
-    outputs.upToDateWhen { false }
-    jvmArgs '-Dfile.encoding=UTF-8'
-}
-
-tasks.register('allureReportArchive', Zip) {
-    group = 'verification'
-    description = 'Runs after allureReport and packages the HTML report as a ZIP archive.'
-    dependsOn tasks.named('allureReport')
-    from layout.buildDirectory.dir('reports/allure-report/allureReport')
-    archiveFileName = 'allure-report.zip'
-    destinationDirectory = layout.buildDirectory.dir('reports')
 }
 
 tasks.named('allureReport') {
@@ -110,21 +78,11 @@ tasks.named('allureReport') {
     }
 }
 
-tasks.register('allureTestReport') {
+tasks.register('allureReportArchive', Zip) {
     group = 'verification'
-    description = 'Runs API and UI tests, generates an Allure report, and archives it.'
-    dependsOn tasks.named('apiTest')
-}
-
-tasks.named('apiTest') {
-    finalizedBy tasks.named('uiTest')
-}
-
-tasks.named('uiTest') {
-    finalizedBy tasks.named('allureReportArchive')
-}
-
-tasks.named('wrapper') {
-    gradleVersion = '9.6.1'
-    distributionType = Wrapper.DistributionType.BIN
+    description = 'Packages the generated Allure HTML report as a ZIP archive.'
+    dependsOn tasks.named('allureReport')
+    from layout.buildDirectory.dir('reports/allure-report/allureReport')
+    archiveFileName = 'allure-report.zip'
+    destinationDirectory = layout.buildDirectory.dir('reports')
 }

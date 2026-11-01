@@ -1,1 +1,3 @@
 rootProject.name = 'aqa-java'
+
+include 'common', 'api-tests', 'ui-tests'

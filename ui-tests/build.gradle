@@ -1,0 +1,26 @@
+plugins {
+    id 'java'
+}
+
+dependencies {
+    testImplementation project(':api-tests')
+    testImplementation platform('io.qameta.allure:allure-bom:2.33.0')
+    testImplementation 'io.qameta.allure:allure-junit5'
+    testImplementation 'io.qameta.allure:allure-selenide'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testImplementation 'org.assertj:assertj-core:3.27.3'
+    testImplementation 'org.seleniumhq.selenium:selenium-java:4.51.0'
+    testImplementation 'com.codeborne:selenide:7.19.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
+}
+
+tasks.register('smokeTest', Test) {
+    group = 'verification'
+    description = 'Runs UI tests tagged smoke.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'smoke'
+    }
+}

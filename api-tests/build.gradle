@@ -1,0 +1,30 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    api project(':common')
+    api platform('io.qameta.allure:allure-bom:2.33.0')
+    api 'io.qameta.allure:allure-java-commons'
+    api 'io.qameta.allure:allure-rest-assured'
+    api 'io.rest-assured:rest-assured:5.5.0'
+    api 'org.slf4j:slf4j-api:2.0.20'
+    api 'org.assertj:assertj-core:3.27.3'
+    api 'net.bytebuddy:byte-buddy:1.18.14'
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'io.qameta.allure:allure-junit5'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.register('smokeTest', Test) {
+    group = 'verification'
+    description = 'Runs API tests tagged smoke.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'smoke'
+    }
+}
