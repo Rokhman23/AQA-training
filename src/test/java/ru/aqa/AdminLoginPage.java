@@ -2,6 +2,7 @@ package ru.aqa;
 
 import com.codeborne.selenide.Selenide;
 import com.codeborne.selenide.SelenideElement;
+import io.qameta.allure.Step;
 
 import static com.codeborne.selenide.Selenide.$;
 
@@ -16,30 +17,36 @@ public class AdminLoginPage {
         return new AdminLoginPageAssert(this);
     }
 
+    @Step("Open admin login page")
     public AdminLoginPage open() {
         Selenide.open(TestConfig.uiUrl() + "/admin");
         return this;
     }
 
+    @Step("Enter username")
     public AdminLoginPage enterUsername(String username) {
         usernameField.setValue(username);
         return this;
     }
 
+    @Step("Enter password")
     public AdminLoginPage enterPassword(String password) {
         passwordField.setValue(password);
         return this;
     }
 
+    @Step("Enter admin credentials")
     public AdminLoginPage enterCredentials(String username, String password) {
         return enterUsername(username).enterPassword(password);
     }
 
+    @Step("Submit admin login form")
     public AdminProductsPage login() {
         loginButton.click();
         return new AdminProductsPage();
     }
 
+    @Step("Log in with configured admin credentials")
     public AdminProductsPage loginAsConfiguredAdmin() {
         return enterCredentials(TestConfig.adminUsername(), TestConfig.adminPassword()).login();
     }

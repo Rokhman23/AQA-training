@@ -3,5 +3,8 @@ build/
 .idea/
 *.iml
 
+/chromedriver/
+/se-metadata.json
+
 .gradle-user-home/
 

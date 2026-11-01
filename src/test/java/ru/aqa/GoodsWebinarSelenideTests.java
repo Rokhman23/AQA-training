@@ -1,38 +1,39 @@
 package ru.aqa;
 
-import io.restassured.response.Response;
 import com.codeborne.selenide.Configuration;
 import com.codeborne.selenide.Selenide;
+import io.qameta.allure.Step;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
-import static io.restassured.RestAssured.given;
 
 @Tag("webinar")
+@DisplayName("Сценарии вебинара: работа с заказами и админкой")
 class GoodsWebinarSelenideTests {
-    private static final String API_URL = TestConfig.apiUrl();
+    private final GoodsApi api = new GoodsApi();
+    private final GoodsApiAssert apiCheck = new GoodsApiAssert();
     private final List<Long> createdIds = new ArrayList<>();
 
     @BeforeEach
     void configureBrowser() {
         Configuration.browser = "chrome";
         Configuration.timeout = TestConfig.elementsTimeoutMs();
+        TestConfig.configureAllureSelenideListener();
         TestConfig.printSafeSettings();
     }
 
     @AfterEach
+    @Step("Delete products created by the webinar tests and close the browser")
     void removeCreatedProductsAndCloseBrowser() {
         for (Long id : createdIds) {
-            given().auth().preemptive()
-                    .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
-                    .delete(API_URL + "/goods/{id}", id);
+            apiCheck.statusIsOneOf(api.deleteProduct(id), 200, 404);
         }
         createdIds.clear();
         Selenide.closeWebDriver();
@@ -96,36 +97,19 @@ class GoodsWebinarSelenideTests {
         mainPage.check().productContainsText(newName, "55");
     }
 
+    @Step("Create product '{name}' through the API and register it for cleanup")
     private long createProduct(String name, int price) {
-        String body = """
-                {"name":"%s","price":%d}
-                """.formatted(name, price);
-        Response response = given().auth().preemptive()
-                .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
-                .contentType("application/json")
-                .body(body)
-                .post(API_URL + "/goods/add");
-        response.then().statusCode(200);
-
-        Map<String, Object> data = response.jsonPath().getMap("data");
-        Object rawId = data.values().iterator().next();
-        long id = Long.parseLong(String.valueOf(rawId));
+        long id = api.createProduct(name, price);
         createdIds.add(id);
         return id;
     }
 
+    @Step("Find product '{name}' id and register it for cleanup")
     private void trackIdByName(String name) {
-        List<Map<String, Object>> goods = given().auth().preemptive()
-                .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
-                .get(API_URL + "/goods/list").then().statusCode(200)
-                .extract().jsonPath().getList("goods");
-        goods.stream()
-                .filter(item -> name.equals(item.get("name")))
-                .map(item -> Long.parseLong(String.valueOf(item.get("id"))))
-                .findFirst()
-                .ifPresent(createdIds::add);
+        api.findProductIdByName(name).ifPresent(createdIds::add);
     }
 
+    @Step("Generate a unique product name with suffix '{suffix}'")
     private String uniqueName(String suffix) {
         return "HW9-" + suffix + "-" + UUID.randomUUID().toString().substring(0, 8);
     }

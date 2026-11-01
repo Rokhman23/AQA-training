@@ -2,21 +2,21 @@ package ru.aqa;
 
 import com.codeborne.selenide.Configuration;
 import com.codeborne.selenide.Selenide;
+import io.qameta.allure.Step;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
-import static io.restassured.RestAssured.given;
-
 @Tag("selenium")
+@DisplayName("UI-тесты магазина на Selenium API через PageObject")
 class GoodsSeleniumTests {
-    private static final String API_URL = TestConfig.apiUrl();
+    private final GoodsApi api = new GoodsApi();
     private final List<Long> createdProductIds = new ArrayList<>();
     private String productName;
 
@@ -24,16 +24,16 @@ class GoodsSeleniumTests {
     void configureBrowser() {
         Configuration.browser = "chrome";
         Configuration.timeout = TestConfig.elementsTimeoutMs();
+        TestConfig.configureAllureSelenideListener();
         TestConfig.printSafeSettings();
         productName = "Selenium-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     @AfterEach
+    @Step("Delete products created by the Selenium tests and close the browser")
     void cleanUp() {
         for (Long id : createdProductIds) {
-            given().auth().preemptive()
-                    .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
-                    .delete(API_URL + "/goods/{id}", id);
+            api.deleteProduct(id);
         }
         createdProductIds.clear();
         Selenide.closeWebDriver();
@@ -80,15 +80,8 @@ class GoodsSeleniumTests {
                 .totalEquals(TestConfig.starterProductPrice());
     }
 
+    @Step("Find product '{name}' id and register it for cleanup")
     private void trackProductIdByName(String name) {
-        List<Map<String, Object>> goods = given().auth().preemptive()
-                .basic(TestConfig.adminUsername(), TestConfig.adminPassword())
-                .get(API_URL + "/goods/list").then().statusCode(200)
-                .extract().jsonPath().getList("goods");
-        goods.stream()
-                .filter(item -> name.equals(item.get("name")))
-                .map(item -> Long.parseLong(String.valueOf(item.get("id"))))
-                .findFirst()
-                .ifPresent(createdProductIds::add);
+        api.findProductIdByName(name).ifPresent(createdProductIds::add);
     }
 }

@@ -4,15 +4,18 @@ import com.codeborne.selenide.Configuration;
 import com.codeborne.selenide.Selenide;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("selenide")
+@DisplayName("Drag-and-drop тесты корзины")
 class GoodsDragAndDropTests {
     @BeforeEach
     void configureBrowser() {
         Configuration.browser = "chrome";
         Configuration.timeout = TestConfig.elementsTimeoutMs();
+        TestConfig.configureAllureSelenideListener();
         TestConfig.printSafeSettings();
     }
 

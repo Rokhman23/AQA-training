@@ -1,5 +1,8 @@
 package ru.aqa;
 
+import com.codeborne.selenide.logevents.SelenideLogger;
+import io.qameta.allure.selenide.AllureSelenide;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -20,6 +23,13 @@ final class TestConfig {
     static String adminPassword() { return required("admin.password"); }
     static String starterProductName() { return required("starter.product.name"); }
     static int starterProductPrice() { return Integer.parseInt(required("starter.product.price")); }
+
+    static void configureAllureSelenideListener() {
+        SelenideLogger.addListener("allure", new AllureSelenide()
+                .screenshots(true)
+                .savePageSource(true)
+                .includeSelenideSteps(true));
+    }
 
     static void printSafeSettings() {
         System.out.println("Test configuration:");
